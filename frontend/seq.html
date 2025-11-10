@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Sequence Diagram</title>
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: sans-serif;
+      margin: 1rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      color: #333;
+      margin-bottom: 1rem;
+    }
+    .diagram-container {
+      background-color: #ffffff;
+      padding: 1.5rem;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      overflow-x: auto;
+    }
+    pre {
+      margin: 0;
+      /* This is a common, robust font stack for monospaced text. */
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1; /* Remove line spacing to connect vertical lines */
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+  <h1>Communication Sequence from Login to Fruit List Display (Detailed Version)</h1>
+  <div class="diagram-container">
+<pre>
+   Browser (User)            Frontend (JS)             Backend (API)             Auth Server (OIDC)            DB (Postgres)
+        │                           │                           │                           │                           │
+(0)     │-----[ Pre-configuration (One-time setup by developer) ]---------------------------│                           │
+        │   The developer registers the client app ('fruit-shop') with the Auth Server.     │                           │
+        │   This includes assigning a Client ID and an allowlist of Redirect URIs.          │                           │
+        │-----------------------------------------------------------------------------------│                           │
+        │                           │                           │                           │                           │
+        │                           │                           │                           │                           │
+        │-----[ 1. Login ]----------│---------------------------│---------------------------│---------------------------│
+        │                           │                           │                           │                           │
+(1)     │=========== (Client-side Navigation) =============================================>│                           │
+        │ GET /authorize                                                                    │                           │
+        │  [Query Params]:                                                                  │                           │
+        │   - response_type, client_id, redirect_uri, scope, state                          │                           │
+        │                           │                           │ [Auth Server validates request]                       │
+        │                           │                           │  - Verifies `client_id` and `redirect_uri` against    │
+        │                           │                           │    its pre-registered allowlist.                      │
+(2a)    │<----------------------------------------------------------------------------------│                           │
+        │ (Receives) Login Page     │                           │                           │                           │
+        │ [Response Headers]: Headers for Browser to enforce:                               │                           │
+        │  - X-Frame-Options: DENY (Prevents clickjacking)                                  │                           │
+        │  - X-Content-Type-Options: nosniff (Prevents MIME sniffing)                       │                           │
+        │  - Content-Security-Policy: default-src 'self' (Mitigates XSS)                    │                           │
+        │                           │                           │                           │                           │
+(2b)    │ [Browser Enforces Policy] │                           │                           │                           │
+        │ - Refuses to render page in an &lt;iframe&gt; due to X-Frame-Options.                   │                           │
+        │ - Trusts server's Content-Type, doesn't guess, due to X-Content-Type-Options.     │                           │
+        │ - Blocks scripts/styles from other origins due to CSP.                            │                           │
+        │                           │                           │                           │                           │
+        │<--[ User Enters ID/PW ]-->│                           │                           │                           │
+        │                           │                           │                           │                           │
+(3)     │---------------------------------------------------------------------------------->│                           │
+        │ POST /login               │                           │                           │                           │
+        │  (The form's action attribute includes query params from step 1)                  │                           │
+        │  [Query Params]: response_type, client_id, redirect_uri, scope, state             │                           │
+        │  [Request Body (Form Data)]:                                                      │                           │
+        │   - username, password                                                            │                           │
+        │                           │                           │ [Auth Server validates credentials & prepares redirect]
+        │                           │                           │  - Re-validates `redirect_uri` against allowlist.     │
+        │                           │                           │  - Generates a single-use authorization `code`.       │
+        │                           │                           │  - Appends `code` and `state` to the `redirect_uri` to construct the final URL.
+(4)     │<=========== (HTTP 302 Redirect) =================================│================│                           │
+        │ (Responds with HTTP 302 Found)                                   │                │                           │
+        │  [Response Headers]:                                             │                │                           │
+        │   - Location: http://localhost:8080/?code=...&state=...  <-------+                │                           │
+        │    The URL now includes:  │                           │                           │                           │
+        │      - code: The single-use authorization code.                                   │                           │
+        │      - state: The value for CSRF protection, must match the original request.     │                           │
+        │                           │                           │                           │                           │
+        │                           │                           │                           │                           │
+        │-----[ 2. Get Tokens ]-----│---------------------------│---------------------------│---------------------------│
+        │                           │                           │                           │                           │
+(5)     │ GET /?code=... ==========>│[JS handles redirect]      │                           │                           │
+        │                           │  - Parses URL for:        │                           │                           │
+        │                           │    - 'code' (auth code)   │                           │                           │
+        │                           │    - 'state' (for CSRF)   │                           │                           │
+        │                           │  - Verifies 'state' matches value stored during step (1).                         │
+        │                           │  - Initiates fetch() to /token endpoint.              │                           │
+        │                           │                           │                           │                           │
+        │ [CORS Preflight: Request] │                           │                           │                           │      
+(7a)    │- - -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ->│                           │
+        │ OPTIONS /api/token        │                           │                           │                           │
+        │  (Browser automatically sends this pre-check for the main request at 8a)          │                           │
+        │  [Request Headers]:                                                               │                           │
+        │   - Origin: http://localhost:8080                                                 │                           │
+        │   - Access-Control-Request-Method: POST                                           │                           │
+        │   - Access-Control-Request-Headers: Content-Type                                  │                           │
+(7b)    │<- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - │                           │
+        │                           │                           │ (Responds with CORS headers)                          │
+        │                           │                           │  [Response Headers]:                                  │
+        │                           │                           │   - Access-Control-Allow-Origin: http://localhost:8080│
+        │                           │                           │   - Access-Control-Allow-Methods: POST, GET, OPTIONS  │
+        │                           │                           │   - Access-Control-Allow-Headers: Content-Type, Authorization
+        │                           │                           │                           │                           │
+(7c)    │ [CORS Preflight: Verification]                        │                           │                           │
+        │  - Verifies `Allow-Origin`, `Allow-Methods`, `Allow-Headers` from preflight response.                         │
+        │  - On failure, blocks main request; `fetch()` rejects with a `TypeError`.         │                           │
+        │                           │                           │                           │                           │
+(8a)    │                           │ [CORS Request: Request]   │                           │                           │
+        │                           │- - - - - - - - - - - - - - - - - - - - - - - - - - - >│                           │
+        │                           │ POST /api/token (XHR)     │                           │                           │
+        │                           │  (The main request, sent only after the preflight check (7a-c) succeeds)          │
+        │                           │  Sends the `code` in a form post.                     │                           │
+        │                           │   [Request Headers]:                                  │                           │
+        │                           │    - Content-Type: application/x-www-form-urlencoded  │                           │
+        │                           │   [Request Body (Form Data)]:                         │                           │
+        │                           │    - grant_type           │                           │                           │
+        │                           │      ('authorization_code': Specifies the OAuth 2.0 flow to exchange a code for tokens)
+        │                           │    - code, redirect_uri, client_id                    │                           │
+        │                           │                           │                           │                           │
+(8b)    │                           │<------------------------------------------------------│                           │
+        │                           │                           │ (Responds with tokens)    │                           │
+        │                           │                           │  [Response Headers]:      │                           │
+        │                           │                           │   - Content-Type: application/json                    │
+        │                           │                           │   - Access-Control-Allow-Origin: http://localhost:8080│
+        │                           │                           │  [Response Body (JSON)]:                              │
+        │                           │                           │   - access_token, id_token, refresh_token, token_type, expires_in
+(8c)    │ [CORS Request: Response Verification]                 │                           │                           │
+        │  - Verifies 'Access-Control-Allow-Origin' header allows the JS origin.            │                           │
+        │  - On failure, blocks response; fetch() rejects with a TypeError.                 │                           │
+(8d)    │                           │ (Receives) access_token, id_token                     │                           │
+        │                           │                           │                           │                           │
+(8e)    │                           │ [Parses ID Token]         │                           │                           │
+        │                           │  - Decodes the id_token to get user info (e.g., name) for the UI.                 │
+        │                           │                           │                           │                           │
+        │                           │                           │                           │                           │
+        │-----[ 3. Fetch Data ]-----│---------------------------│---------------------------│---------------------------│
+        │                           │                           │                           │                           │
+        │ [CORS Preflight: Request] │                           │                           │                           │
+(9a)    │- - - - - - - - - - - - - - - - - - - - - - - - - - - >│ OPTIONS /api/fruits       │                           │
+        │ (Browser automatically sends this pre-check for the main request at 10a)          │                           │
+        │  [Request Headers]:                                                               │                           │
+        │   - Origin: http://localhost:8080                                                 │                           │
+        │   - Access-Control-Request-Method: GET                                            │                           │
+        │   - Access-Control-Request-Headers: Authorization                                 │                           │
+(9b)    │< - - - - - - - - - - - - - - - - - - - - - - - - - - -│                           │                           │
+        │                           │                           │ (Responds with CORS headers)                          │
+        │                           │                           │  [Response Headers]:                                  │
+        │                           │                           │   - Access-Control-Allow-Origin: http://localhost:8080│
+        │                           │                           │   - Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE
+        │                           │                           │   - Access-Control-Allow-Headers: Authorization       │
+(9c)    │ [CORS Preflight: Verification]                        │                           │                           │
+        │  - Verifies `Allow-Origin`, `Allow-Methods`, `Allow-Headers` from preflight response.                         │
+        │  - On failure, blocks main request; `fetch()` rejects with a `TypeError`.         │                           │
+        │                           │                           │                           │                           │
+(10a)   │                           │- [CORS Request: Request]->│                           │                           |
+        │                           │ GET /api/fruits (XHR)     │                           │                           │
+        │                           │   (The main request, sent only after the preflight check succeeds)                │
+        │                           │    [Request Headers]:                                                             │
+        │                           │     - Authorization: Bearer &lt;access_token&gt;                                        │
+        │                           │                           │                           │                           │
+(10b)   │                           │                           │ [Backend Validates Token] │                           │
+        │                           │                           │  The backend performs critical security checks on the access_token (JWT):
+        │                           │                           │  1. **Verify Signature**: To confirm the token is authentic and not tampered with.
+        │                           │                           │     - It needs the Auth Server's public key to do this.
+        │                           │                           │     - [If not cached] Fetches the key set (JWKS) from the Auth Server. 
+        │                           │                           │       GET /jwks.json ---->│                           │
+        │                           │                           │      <--------------------│ (Responds) JWKS with Cache-Control header
+        │                           │                           │     - The key is then cached (e.g., for 10 hours) to improve performance. 
+        │                           │                           │  2. **Verify Claims**: After signature is verified, checks the token's content.
+        │                           │                           │     - 'iss' (Issuer): Is it from the trusted Auth Server?
+        │                           │                           │     - 'aud' (Audience): Is it intended for this API? 
+        │                           │                           │  -> On any failure: 401 Unauthorized & stop           │
+        │                           │                           │                           │                           │
+(11)    │                           │                           │ [Validation OK, Query DB] │                           │
+        │                           │                           │------------------------------------------------------>│
+        │                           │                           │                           │ SELECT * FROM fruit;      │
+        │                           │                           │<------------------------------------------------------│
+        │                           │                           │                           │ (Receives) Fruit data     │
+(12a)   │                           │<- - - - - - - - - - - - - │ (Responds with fruit data)                            │
+        │                           │                           │  [Response Headers]:                                  │
+        │                           │                           │   - Content-Type: application/json                    │
+        │                           │                           │   - Access-Control-Allow-Origin: http://localhost:8080│
+        │                           │                           │  [Response Body (JSON)]:                              │
+        │                           │                           │   - [{id, name, producingarea, price}, ...]           │
+(12b)   │ [CORS Request: Response Verification]                 │                           │                           │
+        │  - Verifies 'Access-Control-Allow-Origin' header allows the JS origin.            │                           │
+        │  - On failure, blocks response; fetch() rejects with a TypeError.                 │                           │
+(13)    │<---[ JS renders list ]----│                           │                           │                           │
+        │                           │                           │                           │                           │
+        o                           o                           o                           o                           o
+</pre>
+  </div>
+
+  <div class="diagram-container" style="margin-top: 2rem; line-height: 1.6;">
+    <h2 style="font-size: 1.2rem; margin-top: 0;">Pre-shared Configuration Details</h2>
+    <p>The following key information must be pre-configured between services before the authentication flow can begin. This is part of the initial application setup by the developer.</p>
+    <ul>
+      <li><strong>Client ID (<code>client_id</code>):</strong> A unique ID for the 'fruit-shop' application.
+        <br><em>Shared: <code>Frontend</code> &harr; <code>Auth Server</code></em>
+        <br><small><strong>- Frontend:</strong> <code>frontend/app.js</code> (in <code>oidcConfig</code> object)</small>
+        <br><small><strong>- Auth Server:</strong> <code>auth-server/main.go</code> (in global <code>config</code> struct)</small>
+      </li>
+
+      <li><strong>Redirect URIs (<code>redirect_uri</code>):</strong> An allowlist of URLs (e.g., <code>http://localhost:8080/</code>) where the user can be returned after login.
+        <br><em>Shared: <code>Frontend</code> &harr; <code>Auth Server</code></em>
+        <br><small><strong>- Frontend:</strong> <code>frontend/app.js</code> (in <code>oidcConfig</code> object)</small>
+        <br><small><strong>- Auth Server:</strong> <code>auth-server/main.go</code> (in global <code>config</code> struct)</small>
+      </li>
+
+      <li><strong>Issuer URL (<code>issuer</code>):</strong> The Auth Server's base URL (<code>http://localhost:8082</code>), used to identify the token issuer.
+        <br><em>Shared: <code>Frontend</code> &harr; <code>Backend</code> &harr; <code>Auth Server</code></em>
+        <br><small><strong>- Frontend:</strong> <code>frontend/app.js</code> (in <code>oidcConfig</code> object)</small>
+        <br><small><strong>- Backend:</strong> <code>backend/server.js</code> (in <code>checkJwt</code> middleware)</small>
+        <br><small><strong>- Auth Server:</strong> <code>auth-server/main.go</code> (in global <code>config</code> struct)</small>
+      </li>
+
+      <li><strong>Audience (<code>audience</code>):</strong> The token's intended recipient, which is the API being protected (e.g., 'fruit-shop').
+        <br><em>Shared: <code>Backend</code> &harr; <code>Auth Server</code></em>
+        <br><small><strong>- Backend:</strong> <code>backend/server.js</code> (in <code>checkJwt</code> middleware)</small>
+        <br><small><strong>- Auth Server:</strong> <code>auth-server/main.go</code> (in global <code>config</code> struct, used as <code>aud</code> claim)</small>
+      </li>
+
+      <li><strong>JWKS URI (<code>jwks_uri</code>):</strong> The endpoint for the Auth Server's public keys, used by the Backend for signature validation.
+        <br><em>Shared: <code>Backend</code> &harr; <code>Auth Server</code></em>
+        <br><small><strong>- Backend:</strong> <code>backend/server.js</code> (in <code>checkJwt</code> middleware)</small>
+        <br><small><strong>- Auth Server:</strong> <code>auth-server/main.go</code> (derived from <code>Issuer</code> in global <code>config</code> struct)</small>
+      </li>
+
+      <li><strong>Scope (<code>scope</code>):</strong> The permissions requested by the Frontend (e.g., <code>openid profile</code>).
+        <br><em>Shared: <code>Frontend</code> &harr; <code>Auth Server</code></em>
+        <br><small><strong>- Frontend:</strong> <code>frontend/app.js</code> (in <code>oidcConfig</code> object)</small>
+        <br><small><strong>- Auth Server:</strong> <code>auth-server/main.go</code> (in global <code>config</code> struct, used as <code>scp</code> claim)</small>
+      </li>
+    </ul>
+  </div>
+
+  <h1 style="margin-top: 3rem;">Access Token Refresh Sequence via Refresh Token</h1>
+  <div class="diagram-container">
+<pre>
+   Browser (User)            Frontend (JS)             Backend (API)             Auth Server (OIDC)            DB (Postgres)
+        │                           │                           │                           │                           │
+        │-----[ 4. Refreshing Access Token (when expired) ]-----│---------------------------│---------------------------│
+        │ (This flow occurs if step 10a fails with a 401 due to an expired token)           │                           │
+        │                           │                           │                           │                           │
+(10a')  │                           │ GET /api/fruits (XHR)---->│                           │                           │
+        │                           │  [Request Headers]:                                                               │
+        │                           │   - Authorization: Bearer &lt;expired_access_token&gt;                                  │
+        │                           │                           │                           │                           │
+(10b')  │                           │                           │ [Backend Validates Token] │                           │
+        │                           │                           │  - Signature/Claims OK, but token is expired.         │
+        │                           │                           │  -> Responds with 401 Unauthorized                    │
+        │                           │                           │                           │                           │
+(10c')  │                           │<--------------------------│ (Responds) 401 Unauthorized                           │
+        │                           │                           │                           │                           │
+(10d')  │                           │ [JS handles 401]          │                           │                           │
+        │                           │  - Instead of logging out, initiates token refresh using the stored refresh_token.│
+        │                           │    (The refresh token was received and stored during step 8b)                     │
+        │                           │                           │                           │                           │
+(10e')  │                           │ POST /api/token (XHR) ------------------------------->│                           │
+        │                           │  [Request Body (Form Data)]:                                                      │
+        │                           │   - grant_type: 'refresh_token'                                                   │
+        │                           │   - refresh_token: &lt;saved_refresh_token&gt;                                          │
+        │                           │   - client_id: 'fruit-shop'                                                       │
+        │                           │                           │                           │                           │
+(10f')  │                           │<------------------------------------------------------│                           │
+        │                           │                           │ (Responds with new token) │                           │
+        │                           │                           │  [Response Body (JSON)]:                              │
+        │                           │                           │   - access_token: &lt;new_access_token&gt;                  │
+        │                           │                           │   - expires_in: 3600                                  │
+        │                           │                           │                           │                           │
+(10g')  │                           │ [JS stores new token]     │                           │                           │
+        │                           │  - Updates the access token in memory and localStorage.                           │
+        │                           │                           │                           │                           │
+(10h')  │                           │ [JS retries API call]     │                           │                           │
+        │                           │ GET /api/fruits (XHR)---->│                           │                           │
+        │                           │  [Request Headers]:                                                               │
+        │                           │   - Authorization: Bearer &lt;new_access_token&gt;                                      │
+        │                           │                           │                           │                           │
+        │                           │                           │ [Backend Validates Token] │                           │
+        │                           │                           │  - Token is now valid.                                │
+        │                           │                           │  -> Proceeds to step (11) in the main diagram.        │
+        o                           o                           o                           o                           o
+</pre>
+  </div>
+</body>
+</html>
