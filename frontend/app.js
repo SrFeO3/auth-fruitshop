@@ -8,6 +8,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     issuer: 'http://localhost:8082',
     clientId: 'fruit-shop',
     // Always redirect to the root of the application after login.
+    // This must match one of the URIs registered in the auth server.
     // This is more robust than using window.location.pathname.
     redirectUri: `${window.location.origin}/`,
     // Request 'offline_access' to get a refresh token for persistent sessions.
@@ -244,14 +245,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Clears session and updates UI
   const logout = async () => {
-    // トークン失効のために、メモリまたはlocalStorageからトークンを取得
+    // Retrieve the token from memory or localStorage on token expiry.
     const tokenToRevoke = accessToken || localStorage.getItem('access_token');
 
     if (tokenToRevoke) {
       try {
-        // サーバーにログアウトを通知し、リフレッシュトークンを無効化する
+        // Send logout notification to the server and disable the refresh token.
         const response = await fetch(`${oidcConfig.issuer}/api/logout`, {
-          method: 'POST', // 状態を変更する操作なのでPOSTを使用
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${tokenToRevoke}`
           }
@@ -264,20 +265,22 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    // サーバー側の処理成否に関わらず、クライアント側の状態をクリアする
+    // Clear client state regardless of server outcome
     accessToken = null;
     user = null;
     refreshToken = null;
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
     localStorage.removeItem('refresh_token');
-    window.location.hash = ''; // ログアウト後にホームページに移動
+    window.location.hash = ''; // Move to homepage after logout
     updateUI();
   };
 
   // Exchanges the authorization code for an access token
   const exchangeCodeForToken = async (code) => {
+    console.log('[exchangeCodeForToken] Starting token exchange process...');
     const codeVerifier = sessionStorage.getItem('oidc-code-verifier');
+    console.log('[exchangeCodeForToken] Retrieved code_verifier from sessionStorage.');
     sessionStorage.removeItem('oidc-code-verifier');
     try {
       const response = await fetch(`${oidcConfig.issuer}/api/token`, {
@@ -294,7 +297,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         }),
       });
 
+      console.log(`[exchangeCodeForToken] Received response with status: ${response.status}`);
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[exchangeCodeForToken] Token exchange failed. Server responded with: ${errorText}`);
         throw new Error(`Token exchange failed: ${response.statusText}`);
       }
 
@@ -302,18 +308,22 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (data.access_token && data.id_token) {
         accessToken = data.access_token;
         localStorage.setItem('access_token', accessToken);
+        console.log('[exchangeCodeForToken] Access token stored in localStorage.');
 
         if (data.refresh_token) {
           refreshToken = data.refresh_token;
           localStorage.setItem('refresh_token', refreshToken);
+          console.log('[exchangeCodeForToken] Refresh token stored in localStorage.');
         }
 
         const idTokenPayload = parseJwt(data.id_token);
         if (idTokenPayload && idTokenPayload.name) {
           user = { name: idTokenPayload.name };
           localStorage.setItem('user', JSON.stringify(user));
+          console.log('[exchangeCodeForToken] User info stored in localStorage:', user);
         }
       }
+      console.log('[exchangeCodeForToken] Token exchange process finished successfully.');
     } catch (error) {
       console.error('Error exchanging code for token:', error);
       pageContent.innerHTML = `<p>Authentication failed. Please try logging in again.</p>`;
@@ -372,7 +382,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Fetches a single fruit's details from the protected backend API
   const fetchFruitDetails = async (fruitId) => {
     if (!accessToken) {
-      console.log("fetchFruitDetails: No access token, skipping fetch.");
+      console.log("fetchFruitDetails: Not logged in, skipping fetch.");
       throw new Error("Not authenticated. Please log in.");
     }
 
@@ -380,6 +390,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Try fetching, with one retry attempt after a token refresh.
     for (let attempt = 0; attempt < 2; attempt++) {
+        console.log(`[fetchFruitDetails] Attempt ${attempt + 1}: Fetching details for fruit ID ${fruitId} from ${apiUrl}`);
         const response = await fetch(apiUrl, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
         });
@@ -416,7 +427,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Fetches fruits from the protected backend API
   const fetchFruits = async () => {
     if (!accessToken) {
-      console.log("fetchFruits: No access token, skipping fetch.");
+      console.log("fetchFruits: Not logged in, skipping fetch.");
       return;
     }
 
@@ -429,6 +440,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Try fetching, with one retry attempt after a token refresh.
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
+        console.log(`[fetchFruits] Attempt ${attempt + 1}: Fetching all fruits from ${apiUrl}`);
         const response = await fetch(apiUrl, {
           headers: {
             'Authorization': `Bearer ${accessToken}`
@@ -521,19 +533,25 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
+  console.log('[init] Checking for authorization code in URL...');
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const state = params.get('state');
 
   if (code && state) {
+    console.log(`[init] Found 'code' and 'state' in URL parameters.`);
+    console.log(`[init] Code: ${code.substring(0, 10)}... (truncated)`);
+    console.log(`[init] State: ${state}`);
     const savedState = sessionStorage.getItem('oidc-state');
+    console.log(`[init] Retrieved saved state from sessionStorage: ${savedState}`);
     sessionStorage.removeItem('oidc-state');
     window.history.replaceState({}, document.title, window.location.pathname);
 
     if (state === savedState) {
+      console.log('[init] State matches. Proceeding to exchange code for token.');
       await exchangeCodeForToken(code);
     } else {
-      console.error('Invalid state parameter. CSRF attack?');
+      console.error(`[init] State mismatch! CSRF attack? URL state: ${state}, Saved state: ${savedState}`);
       pageContent.innerHTML = `<p>Authentication failed due to invalid state. Please try again.</p>`;
     }
   } else {
