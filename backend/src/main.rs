@@ -77,7 +77,10 @@ impl IntoResponse for AppError {
         let (status, message) = match &self {
             AppError::Auth(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
-            AppError::Jwt(_) => (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string()),
+            AppError::Jwt(err) => (
+                StatusCode::UNAUTHORIZED,
+                format!("JWT Error: {:?}", err.kind()),
+            ),
             AppError::Pool(_) | AppError::Postgres(_) | AppError::Reqwest(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
             }
@@ -149,8 +152,11 @@ impl JwksClient {
     async fn get_decoding_key(&self, kid: &str) -> Result<DecodingKey, AppError> {
         // First, check if the key is already in our cache.
         if let Some(key) = self.keys.read().await.get(kid) {
-            info!("JWKS Client: Found key with kid '{}' in cache.", kid);
-            return Ok(key.clone());
+            info!(
+                "JWKS Client: Found key with kid '{}' in cache (from {}).",
+                kid, self.jwks_uri
+            );
+            return Ok(key.clone()); // Return the cached key.
         }
 
         // If not in cache, fetch the entire JWKS from the auth server.
@@ -171,7 +177,16 @@ impl JwksClient {
         }
         info!("JWKS Client: Cache updated with new keys.");
 
-        key_map.get(kid).cloned().ok_or_else(|| AppError::Auth(format!("Unknown key ID '{}'", kid)))
+        // Try to get the key from the now-populated cache.
+        if let Some(key) = key_map.get(kid) {
+            info!(
+                "JWKS Client: Successfully retrieved new key with kid '{}' from {}.",
+                kid, self.jwks_uri
+            );
+            Ok(key.clone())
+        } else {
+            Err(AppError::Auth(format!("Unknown key ID '{}'", kid)))
+        }
     }
 }
 
@@ -261,6 +276,10 @@ async fn auth_middleware(State(state): State<AppState>, request: Request, next: 
             data
         },
         Err(err) => {
+            // Log the kid to make debugging signature errors easier.
+            if let jsonwebtoken::errors::ErrorKind::InvalidSignature = err.kind() {
+                error!("Auth middleware: Invalid signature for token with kid '{}'", kid);
+            }
             // If the error is an invalid issuer, log the expected vs actual values.
             if let jsonwebtoken::errors::ErrorKind::InvalidIssuer = err.kind() {
                 // To inspect claims for logging, decode the token without verifying the signature.
