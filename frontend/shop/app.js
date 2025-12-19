@@ -3,6 +3,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   const authControls = document.getElementById('auth-controls');
   const cartControls = document.getElementById('cart-controls');
 
+  // Base URL for the backend API.
+  const API_BASE_URL = 'http://localhost:5001/api';
+
+  // Base URL for static assets like images.
+  const STATIC_ASSETS_BASE_URL = `${window.location.origin}/images`;
+
   // OIDC Configuration
   const oidcConfig = {
     issuer: 'http://localhost:8082',
@@ -10,7 +16,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Always redirect to the root of the application after login.
     // This must match one of the URIs registered in the auth server.
     // This is more robust than using window.location.pathname.
-    redirectUri: `${window.location.origin}/`,
+    redirectUri: `${window.location.origin}/shop/`,
     // Request 'offline_access' to get a refresh token for persistent sessions.
     // The term 'offline' here refers to the user not being present, allowing the
     // application to refresh tokens in the background without user interaction.
@@ -81,7 +87,7 @@ window.addEventListener('DOMContentLoaded', async () => {
           item.dataset.fruitId = fruit.id; // Add ID for navigation
           item.className = 'fruit-item';
           item.innerHTML = `
-            <img src="images/${fruit.name}.png" alt="${fruit.name}" class="fruit-image" onerror="this.style.display='none'">
+            <img src="${STATIC_ASSETS_BASE_URL}/${fruit.name}.png" alt="${fruit.name}" class="fruit-image" onerror="this.style.display='none'">
             <div class="fruit-info">
               <h3>${fruit.name}</h3>
               <p>Origin: ${fruit.origin}</p>
@@ -107,7 +113,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             <div class="fruit-detail-container">
                 <a href="#" class="back-link">&larr; Back to list</a>
                 <div class="fruit-detail-content">
-                    <img src="images/${fruit.name}.png" alt="${fruit.name}" class="fruit-detail-image" onerror="this.style.display='none'">
+                    <img src="${STATIC_ASSETS_BASE_URL}/${fruit.name}.png" alt="${fruit.name}" class="fruit-detail-image" onerror="this.style.display='none'">
                     <div class="fruit-detail-info">
                         <h1>${fruit.name}</h1>
                         <p class="detail-origin"><strong>Origin:</strong> ${fruit.origin}</p>
@@ -142,7 +148,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         total += item.price * item.quantity;
         cartHTML += `
           <div class="cart-item">
-            <img src="images/${item.name}.png" alt="${item.name}" class="fruit-image" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px;">
+            <img src="${STATIC_ASSETS_BASE_URL}/${item.name}.png" alt="${item.name}" class="fruit-image" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px;">
             <div class="cart-item-info">
               <h3>${item.name}</h3>
               <p>${item.price} yen</p>
@@ -192,13 +198,14 @@ window.addEventListener('DOMContentLoaded', async () => {
       cart.push({ id: fruit.id, name: fruit.name, price: fruit.price, quantity: 1 });
     }
     saveCart();
-    console.log(`${fruit.name} added to cart.`);
+    console.log('[addToCart] Item added successfully.', { id: fruit.id, name: fruit.name });
   };
 
   const updateQuantity = (fruitId, change) => {
     const cartItem = cart.find(item => item.id === fruitId);
     if (!cartItem) return;
 
+    console.log(`[updateQuantity] Updating quantity for item ${fruitId} by ${change}.`);
     cartItem.quantity += change;
 
     if (cartItem.quantity <= 0) {
@@ -209,6 +216,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   };
 
   const clearCart = () => {
+    console.log('[clearCart] Clearing all items from the cart.');
     cart = [];
     saveCart();
     renderCartPage();
@@ -217,6 +225,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Redirects to the OIDC server for login
   const login = async () => {
     try {
+      console.log('[login] Redirecting to authentication server...');
       // Generate a random string for the state parameter (CSRF protection)
       const state = Math.random().toString(36).substring(2);
       sessionStorage.setItem('oidc-state', state);
@@ -245,6 +254,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Clears session and updates UI
   const logout = async () => {
+    console.log('[logout] Starting logout process...');
     // Retrieve the token from memory or localStorage on token expiry.
     const tokenToRevoke = accessToken || localStorage.getItem('access_token');
 
@@ -386,7 +396,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       throw new Error("Not authenticated. Please log in.");
     }
 
-    const apiUrl = `http://localhost:5001/api/fruits/${fruitId}`;
+    const apiUrl = `${API_BASE_URL}/fruits/${fruitId}`;
 
     // Try fetching, with one retry attempt after a token refresh.
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -435,7 +445,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // This prevents re-fetching in a loop if the API returns an empty array.
     fruitsFetched = true;
 
-    const apiUrl = 'http://localhost:5001/api/fruits';
+    const apiUrl = `${API_BASE_URL}/fruits`;
 
     // Try fetching, with one retry attempt after a token refresh.
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -495,6 +505,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateCartControls();
 
     if (isAuthenticated) {
+      console.log('[updateUI] User is authenticated. Rendering main view.');
       authControls.innerHTML = `
         <span class="login-status">Logged in as: <strong>${user.name}</strong></span>
         <button id="logout-button" class="button button-primary">Logout</button>
@@ -512,6 +523,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         renderListPage();
       }
     } else {
+      console.log('[updateUI] User is not authenticated. Rendering login view.');
       authControls.innerHTML = `
         <span class="login-status">Not logged in</span>
         <button id="login-button" class="button button-primary">Login</button>
