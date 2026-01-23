@@ -2,14 +2,6 @@
 # Using a specific version is recommended for production stability.
 FROM postgres:14
 
-# Set environment variables for the database.
-#
-# POSTGRES_PASSWORD: (Mandatory) Sets the password for the 'postgres' superuser.
-# This is required by the official entrypoint script.
-# IMPORTANT: Replace 'your_strong_password' with a secure password for production.
-ENV POSTGRES_PASSWORD=Dgtb353cSW
-
-# Install supervisor to manage multiple processes.
 RUN apt-get update && \
     apt-get install -y supervisor && \
     rm -rf /var/lib/apt/lists/*

@@ -1,6 +1,6 @@
 # ---- Builder Stage ----
 # Use the official Rust image as a builder.
-FROM rust:1.89-slim-bookworm as builder
+FROM rust:1.92-slim-bookworm AS builder
 
 # Install build tools needed for some Rust crate dependencies that compile C code.
 RUN apt-get update && apt-get install -y build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
@@ -17,6 +17,6 @@ RUN touch src/main.rs && cargo build --release
 
 # ---- Final Stage ----
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/src/backend/target/release/backend /usr/local/bin/backend
 CMD ["backend"]
