@@ -1,0 +1,32 @@
+base_url: "http://localhost:8080/shop/"
+oidc_provider_url: "localhost:8082"
+api_base_url: "http://localhost:5001/api"
+
+# Settings for SSL/TLS testing
+ssl:
+  # Set to true to connect via https. If so, change the protocol of base_url and api_base_url to https as well.
+  use_ssl: false
+  # Specify to override the Host header of the HTTP request. If empty, the hostname from the URL is used.
+  host_header: ""
+  # Hostname to set for SNI (Server Name Indication). If empty, the value of host_header is used, and if that is also empty, the hostname from the URL is used.
+  sni_host: ""
+  # Set to true to skip server certificate verification.
+  insecure_skip_verify: false
+
+performance:
+  page_load_threshold: 2.0      # Seconds
+  api_response_threshold: 1.0   # Seconds
+  load_test:
+    concurrency: 10             # Number of simultaneous threads
+    total_requests: 50          # Total number of requests to send
+    threshold_avg_time: 1.0     # Max acceptable average response time (Seconds)
+
+mock_fruits:
+  - id: "1"
+    name: "Apple"
+    origin: "Aomori"
+    price: 100
+  - id: "2"
+    name: "Banana"
+    origin: "Philippines"
+    price: 50

@@ -16,5 +16,9 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get -y install curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /usr/src/auth-server/target/release/rudoidc /usr/local/bin/rudoidc
+COPY config.yaml /usr/local/bin/conf/config.yaml
+
+WORKDIR /usr/local/bin
+ENV RUST_LOG=info
 
 CMD ["/usr/local/bin/rudoidc"]

@@ -1,0 +1,113 @@
+{
+  "session_timestamp": "2026-02-27T16:13:36.410160",
+  "results": [
+    {
+      "test_name": "test_unauthenticated_access[chromium]",
+      "outcome": "passed",
+      "duration": 0.0529,
+      "timestamp": "2026-02-27T16:13:34.831615",
+      "node_id": "test_frontend.py::TestCoreFunctionality::test_unauthenticated_access[chromium]"
+    },
+    {
+      "test_name": "test_fruit_list_rendering[chromium]",
+      "outcome": "passed",
+      "duration": 0.0792,
+      "timestamp": "2026-02-27T16:13:34.943928",
+      "node_id": "test_frontend.py::TestCoreFunctionality::test_fruit_list_rendering[chromium]"
+    },
+    {
+      "test_name": "test_cart_operations[chromium]",
+      "outcome": "passed",
+      "duration": 0.2328,
+      "timestamp": "2026-02-27T16:13:35.205088",
+      "node_id": "test_frontend.py::TestCoreFunctionality::test_cart_operations[chromium]"
+    },
+    {
+      "test_name": "test_login_redirect[chromium]",
+      "outcome": "passed",
+      "duration": 0.0785,
+      "timestamp": "2026-02-27T16:13:35.312900",
+      "node_id": "test_frontend.py::TestAuthenticationFlow::test_login_redirect[chromium]"
+    },
+    {
+      "test_name": "test_token_refresh_failure_and_logout[chromium]",
+      "outcome": "passed",
+      "duration": 0.2298,
+      "timestamp": "2026-02-27T16:13:35.572959",
+      "node_id": "test_frontend.py::TestAuthenticationFlow::test_token_refresh_failure_and_logout[chromium]"
+    },
+    {
+      "test_name": "test_auth_callback_with_error[chromium]",
+      "outcome": "passed",
+      "duration": 0.0381,
+      "timestamp": "2026-02-27T16:13:35.645732",
+      "node_id": "test_frontend.py::TestOIDCErrorHandlingAndSecurity::test_auth_callback_with_error[chromium]"
+    },
+    {
+      "test_name": "test_auth_callback_with_state_mismatch[chromium]",
+      "outcome": "passed",
+      "duration": 0.049,
+      "timestamp": "2026-02-27T16:13:35.724870",
+      "node_id": "test_frontend.py::TestOIDCErrorHandlingAndSecurity::test_auth_callback_with_state_mismatch[chromium]"
+    },
+    {
+      "test_name": "test_oidc_flow_anomalies[chromium]",
+      "outcome": "passed",
+      "duration": 0.2443,
+      "timestamp": "2026-02-27T16:13:35.997490",
+      "node_id": "test_frontend.py::TestOIDCErrorHandlingAndSecurity::test_oidc_flow_anomalies[chromium]"
+    },
+    {
+      "test_name": "test_auth_callback_with_nonce_mismatch[chromium]",
+      "outcome": "passed",
+      "duration": 0.0628,
+      "timestamp": "2026-02-27T16:13:36.094706",
+      "node_id": "test_frontend.py::TestOIDCErrorHandlingAndSecurity::test_auth_callback_with_nonce_mismatch[chromium]"
+    },
+    {
+      "test_name": "test_token_exchange_client_auth_method[chromium]",
+      "outcome": "passed",
+      "duration": 0.036,
+      "timestamp": "2026-02-27T16:13:36.161468",
+      "node_id": "test_frontend.py::TestOIDCErrorHandlingAndSecurity::test_token_exchange_client_auth_method[chromium]"
+    },
+    {
+      "test_name": "test_backend_api_security_patterns[chromium]",
+      "outcome": "passed",
+      "duration": 0.0386,
+      "timestamp": "2026-02-27T16:13:36.226803",
+      "node_id": "test_frontend.py::TestBackendAPISecurity::test_backend_api_security_patterns[chromium]"
+    },
+    {
+      "test_name": "test_page_load_performance[chromium]",
+      "outcome": "passed",
+      "duration": 0.048,
+      "timestamp": "2026-02-27T16:13:36.303573",
+      "node_id": "test_performance.py::TestPerformance::test_page_load_performance[chromium]",
+      "performance_metrics": {
+        "page_load_duration_s": 0.0369
+      }
+    },
+    {
+      "test_name": "test_api_response_time[chromium]",
+      "outcome": "passed",
+      "duration": 0.0024,
+      "timestamp": "2026-02-27T16:13:36.333718",
+      "node_id": "test_performance.py::TestPerformance::test_api_response_time[chromium]",
+      "performance_metrics": {
+        "api_response_duration_s": 0.0022
+      }
+    },
+    {
+      "test_name": "test_concurrent_api_load",
+      "outcome": "passed",
+      "duration": 0.0495,
+      "timestamp": "2026-02-27T16:13:36.388760",
+      "node_id": "test_performance.py::TestPerformance::test_concurrent_api_load",
+      "performance_metrics": {
+        "load_test_avg_time_s": 0.0073,
+        "load_test_rps": 1090.43
+      }
+    }
+  ]
+}

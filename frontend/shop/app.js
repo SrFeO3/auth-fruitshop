@@ -13,6 +13,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const oidcConfig = {
     issuer: 'http://localhost:8082',
     clientId: 'fruit-shop',
+    clientSecret: 'fruit-shop-secret',
     // Always redirect to the root of the application after login.
     // This must match one of the URIs registered in the auth server.
     // This is more robust than using window.location.pathname.
@@ -234,6 +235,10 @@ window.addEventListener('DOMContentLoaded', async () => {
       const codeVerifier = generateCodeVerifier();
       sessionStorage.setItem('oidc-code-verifier', codeVerifier);
       const codeChallenge = await generateCodeChallenge(codeVerifier);
+      
+      // Generate and store nonce for ID Token validation
+      const nonce = generateCodeVerifier(); // Reusing the random string generator
+      sessionStorage.setItem('oidc-nonce', nonce);
 
       const params = new URLSearchParams({
         response_type: 'code',
@@ -243,6 +248,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         state: state,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256',
+        nonce: nonce,
       });
 
       window.location.href = `${oidcConfig.issuer}/authorize?${params.toString()}`;
@@ -292,17 +298,23 @@ window.addEventListener('DOMContentLoaded', async () => {
     const codeVerifier = sessionStorage.getItem('oidc-code-verifier');
     console.log('[exchangeCodeForToken] Retrieved code_verifier from sessionStorage.');
     sessionStorage.removeItem('oidc-code-verifier');
+    const storedNonce = sessionStorage.getItem('oidc-nonce');
+    sessionStorage.removeItem('oidc-nonce');
+
     try {
       const response = await fetch(`${oidcConfig.issuer}/api/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          // For confidential clients, the client ID and secret are sent via Basic Auth.
+          // Note: This is a placeholder for a real secret. In a real SPA, this would not be secure.
+          // This setup assumes a BFF architecture where the SPA is treated as confidential.
+          'Authorization': `Basic ${btoa(`${oidcConfig.clientId}:${oidcConfig.clientSecret}`)}`,
         },
         body: new URLSearchParams({
           grant_type: 'authorization_code',
           code: code,
           redirect_uri: oidcConfig.redirectUri,
-          client_id: oidcConfig.clientId,
           code_verifier: codeVerifier, // Add the verifier for PKCE
         }),
       });
@@ -327,6 +339,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
 
         const idTokenPayload = parseJwt(data.id_token);
+        
+        // Validate Nonce
+        if (idTokenPayload.nonce !== storedNonce) {
+            throw new Error(`Invalid ID Token: Nonce mismatch. Expected ${storedNonce}, got ${idTokenPayload.nonce}`);
+        }
+
         if (idTokenPayload && idTokenPayload.name) {
           user = { name: idTokenPayload.name };
           localStorage.setItem('user', JSON.stringify(user));
@@ -352,11 +370,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       const response = await fetch(`${oidcConfig.issuer}/api/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${btoa(`${oidcConfig.clientId}:${oidcConfig.clientSecret}`)}`,
+        },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token: storedRefreshToken,
-          client_id: oidcConfig.clientId,
         }),
       });
 
@@ -500,7 +520,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // --- Main Application Router and Initializer ---
 
-  const updateUI = async () => {
+  const updateUI = async (showLoginMessage = true) => {
     const isAuthenticated = !!accessToken && !!user;
     updateCartControls();
 
@@ -529,7 +549,9 @@ window.addEventListener('DOMContentLoaded', async () => {
         <button id="login-button" class="button button-primary">Login</button>
       `;
       document.getElementById('login-button').addEventListener('click', login);
-      pageContent.innerHTML = '<p>Please log in to see the fruits.</p>';
+      if (showLoginMessage) {
+        pageContent.innerHTML = '<p>Please log in to see the fruits.</p>';
+      }
     }
   };
 
@@ -544,6 +566,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         localStorage.removeItem('cart');
       }
     }
+
+  let showLoginMessage = true;
 
   console.log('[init] Checking for authorization code in URL...');
   const params = new URLSearchParams(window.location.search);
@@ -562,9 +586,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (state === savedState) {
       console.log('[init] State matches. Proceeding to exchange code for token.');
       await exchangeCodeForToken(code);
+      if (!accessToken) {
+        showLoginMessage = false;
+      }
     } else {
       console.error(`[init] State mismatch! CSRF attack? URL state: ${state}, Saved state: ${savedState}`);
       pageContent.innerHTML = `<p>Authentication failed due to invalid state. Please try again.</p>`;
+      showLoginMessage = false;
     }
   } else {
     accessToken = localStorage.getItem('access_token');
@@ -580,7 +608,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-    await updateUI();
+    await updateUI(showLoginMessage);
   };
 
   // --- Event Listeners ---
