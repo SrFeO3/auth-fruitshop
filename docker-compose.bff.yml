@@ -18,13 +18,12 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
-    image: fruit/shop-backend:1.0.0
+  api-backend:
+    image: ghcr.io/srfeo3/auth-fruitshop/fruitshop-api:main
     container_name: fruit-shop-backend
-    build: ./backend
     restart: always
     ports:
-      - "5001:5000"
+      - "5002:5000"
     environment:
       DATABASE_URL: "postgres://user:password@db:5432/fruitdb"
       OIDC_ISSUER_URL_INTERNAL: http://authserver:8082
@@ -41,12 +40,36 @@ services:
       authserver:
         condition: service_started
 
+  bff:
+    image: ghcr.io/srfeo3/auth-fruitshop/fruitshop-bff:main
+    container_name: fruit-shop-bff
+    restart: always
+    ports:
+      - "5001:5000"
+    environment:
+      API_BACKEND_URL: "http://api-backend:5000"
+      OIDC_ISSUER_URL_INTERNAL: http://authserver:8082
+      OIDC_ISSUER_URL_EXTERNAL: "https://auth.wgd.example.com:8000"
+      CORS_ALLOWED_ORIGINS: "http://localhost:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      api-backend:
+        condition: service_started
+      authserver:
+        condition: service_started
+
   frontend:
     image: nginx:alpine
     container_name: fruit-shop-frontend
     restart: always
     volumes:
-      - ./frontend:/usr/share/nginx/html
+      - ./frontend/common:/usr/share/nginx/html
+      - ./frontend/app-bff.js:/usr/share/nginx/html/shop/app.js
+      - ./frontend/common/shop/style.css:/usr/share/nginx/html/shop/style.css
     ports:
       - "8080:80"
     healthcheck:
