@@ -207,10 +207,10 @@ impl JwksClient {
                     if let Some(x) = &key.x {
                         key_map.insert(key.kid.clone(), DecodingKey::from_ed_components(x)?);
                     }
-                } else if key.kty == "RSA" {
-                    if let (Some(n), Some(e)) = (&key.n, &key.e) {
-                        key_map.insert(key.kid.clone(), DecodingKey::from_rsa_components(n, e)?);
-                    }
+                } else if key.kty == "RSA"
+                    && let (Some(n), Some(e)) = (&key.n, &key.e)
+                {
+                    key_map.insert(key.kid.clone(), DecodingKey::from_rsa_components(n, e)?);
                 }
             }
         }
@@ -440,23 +440,23 @@ async fn add_handler(Path((x, y)): Path<(i32, i32)>, request: Request) -> Json<s
 fn rewrite_api_path(mut req: Request) -> Request {
     let path = req.uri().path();
 
-    if let Some(pos) = path.find("/api/") {
-        if pos != 0 {
-            let new_path = &path[pos..];
+    if let Some(pos) = path.find("/api/")
+        && pos != 0
+    {
+        let new_path = &path[pos..];
 
-            // Preserve query parameters (e.g., ?foo=bar)
-            let query = req
-                .uri()
-                .query()
-                .map(|q| format!("?{}", q))
-                .unwrap_or_default();
-            let new_pq = format!("{}{}", new_path, query);
+        // Preserve query parameters (e.g., ?foo=bar)
+        let query = req
+            .uri()
+            .query()
+            .map(|q| format!("?{}", q))
+            .unwrap_or_default();
+        let new_pq = format!("{}{}", new_path, query);
 
-            let mut parts = req.uri().clone().into_parts();
-            parts.path_and_query = Some(new_pq.parse().unwrap());
+        let mut parts = req.uri().clone().into_parts();
+        parts.path_and_query = Some(new_pq.parse().unwrap());
 
-            *req.uri_mut() = Uri::from_parts(parts).unwrap();
-        }
+        *req.uri_mut() = Uri::from_parts(parts).unwrap();
     }
     req
 }
@@ -472,7 +472,10 @@ fn create_http_client() -> Result<reqwest::Client, Box<dyn std::error::Error>> {
     let mut builder = reqwest::Client::builder();
 
     if let Ok(cert_path) = std::env::var("TRUST_CERTIFICATE_ROOT") {
-        info!("Loading custom CA certificates from TRUST_CERTIFICATE_ROOT: {}", cert_path);
+        info!(
+            "Loading custom CA certificates from TRUST_CERTIFICATE_ROOT: {}",
+            cert_path
+        );
         let cert_data = std::fs::read(&cert_path)
             .map_err(|e| format!("Failed to read certificate file at '{}': {}", cert_path, e))?;
 
@@ -485,7 +488,9 @@ fn create_http_client() -> Result<reqwest::Client, Box<dyn std::error::Error>> {
         }
         info!("Successfully registered {} root certificates.", count);
     } else {
-        warn!("TRUST_CERTIFICATE_ROOT environment variable not set. Falling back to default system roots.");
+        warn!(
+            "TRUST_CERTIFICATE_ROOT environment variable not set. Falling back to default system roots."
+        );
     }
 
     Ok(builder.build()?)
