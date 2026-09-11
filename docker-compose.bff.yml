@@ -1,8 +1,7 @@
 services:
   db:
-    image: fruit/shop-db:1.0.0
+    image: postgres:14
     container_name: fruit-shop-db
-    build: ./db
     restart: always
     environment:
       POSTGRES_USER: user
@@ -79,9 +78,11 @@ services:
       retries: 5
 
   authserver:
-    image: fruit/shop-authserver:1.0.0
+    image: ghcr.io/srfeo3/rudoidc:latest
     container_name: fruit-shop-authserver
-    build: ./authserver
+    restart: always
+    volumes:
+      - ./authserver/config.yaml:/usr/local/bin/conf/config.yaml
     ports:
       - "8082:8082"
     healthcheck:
