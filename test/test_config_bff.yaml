@@ -1,0 +1,32 @@
+base_url: "http://localhost:8080/shop/"
+oidc_provider_url: "localhost:8082"
+api_base_url: "http://localhost:5001/api"
+
+# OIDC client credentials
+oidc_client_id: "fruit-shop"
+oidc_client_secret: "fruit-shop-secret"
+
+# Settings for SSL/TLS testing
+ssl:
+  use_ssl: false
+  host_header: ""
+  sni_host: ""
+  insecure_skip_verify: false
+
+performance:
+  page_load_threshold: 2.0
+  api_response_threshold: 1.0
+  load_test:
+    concurrency: 10
+    total_requests: 50
+    threshold_avg_time: 1.0
+
+mock_fruits:
+  - id: "1"
+    name: "Apple"
+    origin: "Aomori"
+    price: 100
+  - id: "2"
+    name: "Banana"
+    origin: "Philippines"
+    price: 50

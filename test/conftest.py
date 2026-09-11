@@ -8,9 +8,30 @@ from datetime import datetime
 test_results = []
 
 @pytest.fixture(scope="session")
-def test_config():
-    """Fixture to load the YAML config file."""
-    config_path = os.path.join(os.path.dirname(__file__), "test_config.yaml")
+def test_config(request):
+    """Fixture to load the YAML config file based on the mode marker."""
+    # Determine config file from markers
+    markers = [m.name for m in request.node.iter_markers()]
+    if "bff" in markers:
+        config_file = "test_config_bff.yaml"
+    else:
+        config_file = "test_config_direct.yaml"
+    
+    config_path = os.path.join(os.path.dirname(__file__), config_file)
+    with open(config_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+@pytest.fixture(scope="session")
+def test_config_direct():
+    """Fixture to load the direct mode config file."""
+    config_path = os.path.join(os.path.dirname(__file__), "test_config_direct.yaml")
+    with open(config_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+@pytest.fixture(scope="session")
+def test_config_bff():
+    """Fixture to load the BFF mode config file."""
+    config_path = os.path.join(os.path.dirname(__file__), "test_config_bff.yaml")
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 

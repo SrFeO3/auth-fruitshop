@@ -29,6 +29,7 @@ def setup(page: Page):
     # Display browser console logs in the standard output (for debugging).
     page.on("console", lambda msg: print(f"Browser Console: {msg.text}"))
 
+@pytest.mark.direct
 @pytest.mark.core
 class TestCoreFunctionality:
     """Tests for basic UI elements and core application features (non-auth)."""
@@ -93,6 +94,7 @@ class TestCoreFunctionality:
         page.reload()
         expect(page.locator(".cart-summary")).to_contain_text(f"Total: {expected_price * 2} yen")
 
+@pytest.mark.direct
 @pytest.mark.auth
 class TestAuthenticationFlow:
     """Tests for the standard OIDC authentication and token handling flows."""
@@ -121,6 +123,7 @@ class TestAuthenticationFlow:
         expect(page.locator(".login-status")).to_contain_text("Not logged in")
         assert page.evaluate("() => localStorage.getItem('access_token')") is None
 
+@pytest.mark.direct
 @pytest.mark.security
 class TestOIDCErrorHandlingAndSecurity:
     """Tests for security, protocol correctness, and error handling in the OIDC flow."""
@@ -206,7 +209,8 @@ class TestOIDCErrorHandlingAndSecurity:
         """Verify client_id is sent via Basic Auth, not in the request body."""
         base_url, oidc_url = test_config["base_url"], test_config["oidc_provider_url"]
         scheme = "https" if test_config.get("ssl", {}).get("use_ssl") else "http"
-        client_id, client_secret = "fruit-shop", "fruit-shop-secret"
+        client_id = test_config["oidc_client_id"]
+        client_secret = test_config["oidc_client_secret"]
         token_endpoint = f"{scheme}://{oidc_url}/api/token"
 
         page.goto(base_url)
@@ -230,6 +234,7 @@ class TestOIDCErrorHandlingAndSecurity:
         assert auth_header == expected_auth, "Authorization header value mismatch."
         assert post_data_params.get("grant_type") == "authorization_code"
 
+@pytest.mark.direct
 @pytest.mark.security
 class TestBackendAPISecurity:
     """Tests that directly probe the backend API for security vulnerabilities."""

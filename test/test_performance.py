@@ -2,6 +2,7 @@ import pytest
 import time
 from playwright.sync_api import Page, APIRequestContext
 
+@pytest.mark.direct
 @pytest.mark.performance
 class TestPerformance:
     """Tests for measuring application performance."""
